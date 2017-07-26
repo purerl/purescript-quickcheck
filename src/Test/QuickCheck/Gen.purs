@@ -218,8 +218,9 @@ elements (x :| xs) = do
 -- | Generate a random permutation of the given array
 shuffle :: forall a. Array a -> Gen (Array a)
 shuffle xs = do
-  ns <- vectorOf (length xs) (chooseInt 0 top)
+  ns <- vectorOf (length xs) (chooseInt 0 topJsInt)
   pure (map snd (sortBy (comparing fst) (zip ns xs)))
+  where topJsInt = 2147483647
 
 -- | Run a random generator
 runGen :: forall a. Gen a -> GenState -> Tuple a GenState
