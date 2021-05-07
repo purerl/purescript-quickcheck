@@ -221,7 +221,7 @@ elements xs = do
 -- | Generate a random permutation of the given array
 shuffle :: forall a. Array a -> Gen (Array a)
 shuffle xs = do
-  ns <- vectorOf (length xs) (chooseInt 0 top)
+  ns <- vectorOf (length xs) (chooseInt 0 2147483647)
   pure (map snd (sortBy (comparing fst) (zip ns xs)))
 
 -- | Run a random generator
