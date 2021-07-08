@@ -9,4 +9,4 @@ test:
 	spago -x test.dhall test
 
 clean:
-	rm -rf ebin output src/compiled_ps
+	rm -rf ebin output
