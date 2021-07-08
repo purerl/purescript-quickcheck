@@ -1,15 +1,12 @@
-.PHONY: ps erl all run
+.PHONY: ps ps_test erl all test clean
 
-all: ps erl
+all: ps
 
 ps:
-	rm -rf ouput/*
-	psc-package sources | xargs pserlc 'src/**/*.purs' 'test/**/*.purs'
+	spago build
 
-erl:
-	mkdir -p ebin
-	rm -rf ebin/*
-	erlc -o ebin/ output/*/*.erl
+test:
+	spago -x test.dhall test
 
-test: ps erl
-	erl -pa ebin -noshell -eval '(test_main@ps:main@c())()' -eval 'init:stop()'
+clean:
+	rm -rf ebin output src/compiled_ps

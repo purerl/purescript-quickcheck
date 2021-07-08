@@ -7,29 +7,41 @@ module Test.QuickCheck.Arbitrary
   , genericCoarbitrary
   , class ArbitraryGenericSum
   , arbitraryGenericSum
+  , class ArbitraryRowList
+  , arbitraryRecord
   ) where
 
 import Prelude
-
 import Control.Monad.Gen.Class (chooseBool)
 import Control.Monad.Gen.Common as MGC
-
-import Data.Char (toCharCode, fromCharCode)
+import Data.Array ((:))
+import Data.Array.NonEmpty (NonEmptyArray)
+import Data.Array.NonEmpty as NEA
 import Data.Either (Either(..))
+import Data.Enum (fromEnum, toEnumWithDefaults)
 import Data.Foldable (foldl)
+import Data.Generic.Rep (class Generic, to, from, NoArguments(..), Sum(..), Product(..), Constructor(..), Argument(..))
 import Data.Identity (Identity(..))
 import Data.Int (toNumber)
 import Data.Lazy (Lazy, defer, force)
 import Data.List (List)
 import Data.List.NonEmpty (NonEmptyList(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (wrap)
-import Data.NonEmpty (NonEmpty(..), (:|))
-import Data.String (charCodeAt, fromCharArray, split)
+import Data.NonEmpty (NonEmpty(..))
+import Data.String (split)
+import Data.String.CodeUnits (charAt, fromCharArray)
+import Data.String.NonEmpty (NonEmptyString)
+import Data.String.NonEmpty as NES
+import Data.String.NonEmpty.CodeUnits as NESCU
+import Data.Symbol (class IsSymbol)
 import Data.Tuple (Tuple(..))
-import Data.Generic.Rep (class Generic, to, from, NoArguments(..), Sum(..), Product(..), Constructor(..), Argument(..), Rec(..), Field(..))
-
-import Test.QuickCheck.Gen (Gen, elements, listOf, chooseInt, sized, perturbGen, repeatable, arrayOf, oneOf, uniform)
+import Partial.Unsafe (unsafePartial)
+import Prim.Row as Row
+import Prim.RowList as RL
+import Record as Record
+import Test.QuickCheck.Gen (Gen, arrayOf, chooseInt, elements, listOf, oneOf, perturbGen, repeatable, sized, uniform)
+import Type.Proxy (Proxy(..))
 
 -- | The `Arbitrary` class represents those types whose values can be
 -- | _randomly-generated_.
@@ -74,13 +86,19 @@ instance arbString :: Arbitrary String where
   arbitrary = fromCharArray <$> arbitrary
 
 instance coarbString :: Coarbitrary String where
-  coarbitrary s = coarbitrary $ (charCodeAt zero <$> split (wrap "") s)
+  coarbitrary s = coarbitrary $ (charAt zero <$> split (wrap "") s)
+
+instance arbNonEmptyString :: Arbitrary NonEmptyString where
+  arbitrary = NESCU.cons <$> arbitrary <*> arbitrary
+
+instance coarbNonEmptyString :: Coarbitrary NonEmptyString where
+  coarbitrary = coarbitrary <<< NES.toString
 
 instance arbChar :: Arbitrary Char where
-  arbitrary = fromCharCode <$> chooseInt 0 65536
+  arbitrary = toEnumWithDefaults bottom top <$> chooseInt 0 65536
 
 instance coarbChar :: Coarbitrary Char where
-  coarbitrary c = coarbitrary $ toCharCode c
+  coarbitrary c = coarbitrary $ fromEnum c
 
 instance arbUnit :: Arbitrary Unit where
   arbitrary = pure unit
@@ -89,7 +107,7 @@ instance coarbUnit :: Coarbitrary Unit where
   coarbitrary _ = perturbGen 1.0
 
 instance arbOrdering :: Arbitrary Ordering where
-  arbitrary = elements $ LT :| [EQ, GT]
+  arbitrary = elements $ unsafePartial fromJust $ NEA.fromArray [ LT, EQ, GT ]
 
 instance coarbOrdering :: Coarbitrary Ordering where
   coarbitrary LT = perturbGen 1.0
@@ -100,7 +118,16 @@ instance arbArray :: Arbitrary a => Arbitrary (Array a) where
   arbitrary = arrayOf arbitrary
 
 instance coarbArray :: Coarbitrary a => Coarbitrary (Array a) where
-  coarbitrary = foldl (\f x -> f <<< coarbitrary x) id
+  coarbitrary = foldl (\f x -> f <<< coarbitrary x) identity
+
+instance arbNonEmptyArray :: Arbitrary a => Arbitrary (NonEmptyArray a) where
+  arbitrary = do
+    x <- arbitrary
+    xs <- arbitrary
+    pure $ NEA.cons x xs
+
+instance coarbNonEmptyArray :: Coarbitrary a => Coarbitrary (NonEmptyArray a) where
+  coarbitrary = coarbitrary <<< NEA.toArray
 
 instance arbFunction :: (Coarbitrary a, Arbitrary b) => Arbitrary (a -> b) where
   arbitrary = repeatable (\a -> coarbitrary a arbitrary)
@@ -127,14 +154,14 @@ instance arbEither :: (Arbitrary a, Arbitrary b) => Arbitrary (Either a b) where
   arbitrary = MGC.genEither arbitrary arbitrary
 
 instance coarbEither :: (Coarbitrary a, Coarbitrary b) => Coarbitrary (Either a b) where
-  coarbitrary (Left a)  = coarbitrary a
+  coarbitrary (Left a) = coarbitrary a
   coarbitrary (Right b) = coarbitrary b
 
 instance arbitraryList :: Arbitrary a => Arbitrary (List a) where
   arbitrary = sized \n -> chooseInt zero n >>= flip listOf arbitrary
 
 instance coarbList :: Coarbitrary a => Coarbitrary (List a) where
-  coarbitrary = foldl (\f x -> f <<< coarbitrary x) id
+  coarbitrary = foldl (\f x -> f <<< coarbitrary x) identity
 
 instance arbitraryIdentity :: Arbitrary a => Arbitrary (Identity a) where
   arbitrary = Identity <$> arbitrary
@@ -164,7 +191,7 @@ instance arbitraryNoArguments :: Arbitrary NoArguments where
   arbitrary = pure NoArguments
 
 instance coarbitraryNoArguments :: Coarbitrary NoArguments where
-  coarbitrary NoArguments = id
+  coarbitrary NoArguments = identity
 
 -- | To be able to evenly distribute over chains of Sum types we build up
 -- | a collection of generators and choose between.  Each right component
@@ -173,13 +200,13 @@ class ArbitraryGenericSum t where
   arbitraryGenericSum :: Array (Gen t)
 
 instance arbGenSumSum :: (Arbitrary l, ArbitraryGenericSum r) => ArbitraryGenericSum (Sum l r) where
-  arbitraryGenericSum = [Inl <$> arbitrary] <> (map Inr <$> arbitraryGenericSum)
+  arbitraryGenericSum = (Inl <$> arbitrary) : (map Inr <$> arbitraryGenericSum)
 
 instance arbGenSumConstructor :: Arbitrary a => ArbitraryGenericSum (Constructor s a) where
-  arbitraryGenericSum = [arbitrary]
+  arbitraryGenericSum = [ arbitrary ]
 
 instance arbitrarySum :: (Arbitrary l, ArbitraryGenericSum r) => Arbitrary (Sum l r) where
-  arbitrary = oneOf $ (Inl <$> arbitrary) :| (map Inr <$> arbitraryGenericSum)
+  arbitrary = oneOf $ unsafePartial fromJust $ NEA.fromArray $ (Inl <$> arbitrary) : (map Inr <$> arbitraryGenericSum)
 
 instance coarbitrarySum :: (Coarbitrary l, Coarbitrary r) => Coarbitrary (Sum l r) where
   coarbitrary (Inl l) = coarbitrary l
@@ -203,23 +230,38 @@ instance arbitraryArgument :: Arbitrary a => Arbitrary (Argument a) where
 instance coarbitraryArgument :: Coarbitrary a => Coarbitrary (Argument a) where
   coarbitrary (Argument a) = coarbitrary a
 
-instance arbitraryRec :: Arbitrary a => Arbitrary (Rec a) where
-  arbitrary = Rec <$> arbitrary
-
-instance coarbitraryRec :: Coarbitrary a => Coarbitrary (Rec a) where
-  coarbitrary (Rec a) = coarbitrary a
-
-instance arbitraryField :: Arbitrary a => Arbitrary (Field s a) where
-  arbitrary = Field <$> arbitrary
-
-instance coarbitraryField :: Coarbitrary a => Coarbitrary (Field s a) where
-  coarbitrary (Field a) = coarbitrary a
-
 -- | A `Generic` implementation of the `arbitrary` member from the `Arbitrary` type class.
 genericArbitrary :: forall a rep. Generic a rep => Arbitrary rep => Gen a
 genericArbitrary = to <$> (arbitrary :: Gen rep)
 
 -- | A `Generic` implementation of the `coarbitrary` member from the `Coarbitrary` type class.
-genericCoarbitrary :: forall a rep. Generic a rep => Coarbitrary rep => a -> Gen a -> Gen a
-genericCoarbitrary x g = to <$> coarbitrary (from x) (from <$> g)
+genericCoarbitrary :: forall a rep t. Generic a rep => Coarbitrary rep => a -> Gen t -> Gen t
+genericCoarbitrary x = coarbitrary (from x)
 
+class ArbitraryRowList :: RL.RowList Type -> Row Type -> Constraint
+class ArbitraryRowList list row | list -> row where
+  arbitraryRecord :: forall rlproxy. rlproxy list -> Gen (Record row)
+
+instance arbitraryRowListNil :: ArbitraryRowList RL.Nil () where
+  arbitraryRecord _ = pure {}
+
+instance arbitraryRowListCons ::
+  ( Arbitrary a
+  , ArbitraryRowList listRest rowRest
+  , Row.Lacks key rowRest
+  , Row.Cons key a rowRest rowFull
+  , RL.RowToList rowFull (RL.Cons key a listRest)
+  , IsSymbol key
+  ) =>
+  ArbitraryRowList (RL.Cons key a listRest) rowFull where
+  arbitraryRecord _ = do
+    value <- arbitrary
+    previous <- arbitraryRecord (Proxy :: Proxy listRest)
+    pure $ Record.insert (Proxy :: Proxy key) value previous
+
+instance arbitraryRecordInstance ::
+  ( RL.RowToList row list
+  , ArbitraryRowList list row
+  ) =>
+  Arbitrary (Record row) where
+  arbitrary = arbitraryRecord (Proxy :: Proxy list)

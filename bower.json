@@ -1,14 +1,14 @@
 {
   "name": "purescript-quickcheck",
   "homepage": "https://github.com/purescript/purescript-quickcheck",
-  "license": "MIT",
+  "license": "BSD-3-Clause",
   "authors": [
     "John A. De Goes <john@degoes.net> (http://degoes.net)",
     "Phil Freeman <freeman.phil@gmail.com>"
   ],
   "repository": {
     "type": "git",
-    "url": "git://github.com/purescript/purescript-quickcheck.git"
+    "url": "https://github.com/purescript/purescript-quickcheck.git"
   },
   "ignore": [
     "**/.*",
@@ -20,18 +20,36 @@
     "package.json"
   ],
   "dependencies": {
-    "purescript-arrays": "^4.0.0",
-    "purescript-console": "^3.0.0",
-    "purescript-either": "^3.0.0",
-    "purescript-enums": "^3.0.0",
-    "purescript-exceptions": "^3.0.0",
-    "purescript-gen": "^1.0.0",
-    "purescript-lists": "^4.0.0",
-    "purescript-nonempty": "^4.0.0",
-    "purescript-partial": "^1.2.0",
-    "purescript-random": "^3.0.0",
-    "purescript-strings": "^3.0.0",
-    "purescript-transformers": "^3.0.0",
-    "purescript-generics-rep": "^5.0.0"
+    "purescript-arrays": "^6.0.0",
+    "purescript-console": "^5.0.0",
+    "purescript-control": "^5.0.0",
+    "purescript-effect": "^3.0.0",
+    "purescript-either": "^5.0.0",
+    "purescript-enums": "^5.0.0",
+    "purescript-exceptions": "^5.0.0",
+    "purescript-foldable-traversable": "^5.0.0",
+    "purescript-gen": "^3.0.0",
+    "purescript-identity": "^5.0.0",
+    "purescript-integers": "^5.0.0",
+    "purescript-lazy": "^5.0.0",
+    "purescript-lcg": "^3.0.0",
+    "purescript-lists": "^6.0.0",
+    "purescript-math": "^3.0.0",
+    "purescript-maybe": "^5.0.0",
+    "purescript-newtype": "^4.0.0",
+    "purescript-nonempty": "^6.0.0",
+    "purescript-partial": "^3.0.0",
+    "purescript-prelude": "^5.0.0",
+    "purescript-record": "^3.0.0",
+    "purescript-st": "^5.0.0",
+    "purescript-strings": "^5.0.0",
+    "purescript-tailrec": "^5.0.0",
+    "purescript-transformers": "^5.0.0",
+    "purescript-tuples": "^6.0.0",
+    "purescript-unfoldable": "^5.0.0"
+  },
+  "devDependencies": {
+    "purescript-assert": "^5.0.0",
+    "purescript-numbers": "^8.0.0"
   }
 }
